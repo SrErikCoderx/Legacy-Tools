@@ -47,19 +47,10 @@ struct FileParam {
     std::u16string data;
 };
 
-// Compression header used by 4J/Minecraft Console
-struct CompressionHeader {
-    uint32_t magic; // e.g. 'ZLIB' or similar, but often just uncompressed size
-    uint32_t compressedSize;
-    uint32_t uncompressedSize;
-};
-
 struct FileEntry {
     uint32_t type;
     std::u16string name;
     uint32_t fileSize;
-    bool isCompressed;
-    uint32_t uncompressedSize;
     std::vector<FileParam> parameters;
     std::vector<uint8_t> data;
 };
