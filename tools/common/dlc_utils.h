@@ -7,10 +7,7 @@
 
 namespace DLC {
 
-// Simple UTF-16LE to UTF-8 conversion without using deprecated codecvt
-// Note: This is a basic conversion for the BMP (Basic Multilingual Plane).
-// For a full implementation, a more robust library or iconv should be used.
-std::string utf16le_to_utf8(const std::u16string& utf16) {
+inline std::string utf16le_to_utf8(const std::u16string& utf16) {
     std::string utf8;
     for (char16_t cp : utf16) {
         if (cp < 0x80) {
@@ -27,7 +24,7 @@ std::string utf16le_to_utf8(const std::u16string& utf16) {
     return utf8;
 }
 
-std::u16string utf8_to_utf16le(const std::string& utf8) {
+inline std::u16string utf8_to_utf16le(const std::string& utf8) {
     std::u16string utf16;
     for (size_t i = 0; i < utf8.size(); ) {
         uint32_t cp = 0;

@@ -6,100 +6,103 @@
 #include <zlib.h>
 #include "../common/dlc_format.h"
 #include "../common/dlc_utils.h"
+#include "../common/dlc_pack_format.h"
+#include "../common/archive_format.h"
 
 namespace fs = std::filesystem;
 
-void write_u16string(std::ofstream& file, const std::u16string& str) {
-    uint32_t wchCount = static_cast<uint32_t>(str.size());
-    file.write(reinterpret_cast<const char*>(&wchCount), sizeof(wchCount));
-    file.write(reinterpret_cast<const char*>(str.data()), wchCount * sizeof(char16_t));
-}
-
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <output_dlc> <input_dir> [--compress]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <output_file> <input_dir> [--compress] [--dlc]" << std::endl;
         return 1;
     }
 
     std::string outputFileName = argv[1];
     std::string inputDir = argv[2];
-    bool compressFiles = (argc >= 4 && std::string(argv[3]) == "--compress");
+    bool doCompress = false;
+    bool forceDLC = false;
+
+    for (int i = 3; i < argc; ++i) {
+        if (std::string(argv[i]) == "--compress") doCompress = true;
+        if (std::string(argv[i]) == "--dlc") forceDLC = true;
+    }
 
     if (!fs::exists(inputDir) || !fs::is_directory(inputDir)) {
         std::cerr << "Error: Input directory does not exist." << std::endl;
         return 1;
     }
 
-    std::ofstream file(outputFileName, std::ios::binary);
+    std::vector<fs::path> inputFiles;
+    for (const auto& entry : fs::recursive_directory_iterator(inputDir)) {
+        if (entry.is_regular_file()) inputFiles.push_back(entry.path());
+    }
+
+    std::fstream file(outputFileName, std::ios::out | std::ios::binary);
     if (!file) {
-        std::cerr << "Error: Could not create output file " << outputFileName << std::endl;
+        std::cerr << "Error: Could not create output file." << std::endl;
         return 1;
     }
 
-    uint32_t version = DLC::CURRENT_DLC_VERSION;
-    file.write(reinterpret_cast<const char*>(&version), sizeof(version));
+    bool isPck = (!forceDLC && (outputFileName.size() >= 4 && (outputFileName.substr(outputFileName.size() - 4) == ".pck" || outputFileName.substr(outputFileName.size() - 4) == ".arc")));
 
-    uint32_t globalParamCount = 1;
-    file.write(reinterpret_cast<const char*>(&globalParamCount), sizeof(globalParamCount));
-    uint32_t paramType = DLC::PARAM_DISPLAY_NAME;
-    file.write(reinterpret_cast<const char*>(&paramType), sizeof(paramType));
-    write_u16string(file, DLC::utf8_to_utf16le("Custom DLC Pack"));
+    if (isPck) {
+        std::cout << "Creating Legacy Console Archive (.pck/.arc)..." << std::endl;
+        std::vector<std::string> names;
+        std::vector<std::vector<uint8_t>> data;
+        for (const auto& p : inputFiles) {
+            std::string rel = fs::relative(p, inputDir).string();
+            std::replace(rel.begin(), rel.end(), '\\', '/');
+            names.push_back(rel);
 
-    std::vector<fs::path> inputFiles;
-    for (const auto& entry : fs::recursive_directory_iterator(inputDir)) {
-        if (entry.is_regular_file()) {
-            inputFiles.push_back(entry.path());
+            std::ifstream inFile(p, std::ios::binary);
+            std::vector<uint8_t> content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+
+            if (doCompress) {
+                uLongf cSize = compressBound(content.size());
+                std::vector<uint8_t> compressed(cSize);
+                if (compress(compressed.data(), &cSize, content.data(), content.size()) == Z_OK) {
+                    compressed.resize(cSize);
+                    data.push_back(compressed);
+                } else data.push_back(content);
+            } else data.push_back(content);
         }
-    }
+        DLC::Archive arc;
+        arc.save(file, names, data);
+    } else {
+        std::cout << "Creating Legacy Console DLC Pack (.dlc)..." << std::endl;
+        DLC::DLCPack pack;
+        pack.version = 3;
 
-    uint32_t fileCount = static_cast<uint32_t>(inputFiles.size());
-    file.write(reinterpret_cast<const char*>(&fileCount), sizeof(fileCount));
+        DLC::FileParam fp;
+        fp.type = DLC::PARAM_DISPLAY_NAME;
+        fp.data = DLC::utf8_to_utf16le("Custom Pack");
+        pack.globalParameters.push_back(fp);
 
-    struct PreparedFile {
-        std::vector<uint8_t> data;
-        uint32_t originalSize;
-        uint32_t type;
-        std::u16string u16Path;
-    };
-    std::vector<PreparedFile> preparedFiles;
+        for (const auto& p : inputFiles) {
+            DLC::FileEntry entry;
+            std::string rel = fs::relative(p, inputDir).string();
+            std::replace(rel.begin(), rel.end(), '\\', '/');
+            entry.name = DLC::utf8_to_utf16le(rel);
+            entry.type = DLC::TYPE_TEXTURE;
 
-    for (const auto& path : inputFiles) {
-        std::ifstream inFile(path, std::ios::binary);
-        std::vector<uint8_t> rawData((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+            std::ifstream inFile(p, std::ios::binary);
+            std::vector<uint8_t> content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
 
-        PreparedFile pf;
-        pf.originalSize = rawData.size();
-        pf.type = DLC::TYPE_TEXTURE;
-        std::string relativePath = fs::relative(path, inputDir).string();
-        pf.u16Path = DLC::utf8_to_utf16le(relativePath);
+            if (doCompress) {
+                uLongf cSize = compressBound(content.size());
+                entry.data.resize(cSize);
+                if (compress(entry.data.data(), &cSize, content.data(), content.size()) == Z_OK) {
+                    entry.data.resize(cSize);
+                } else entry.data = content;
+            } else entry.data = content;
 
-        if (compressFiles) {
-            uLongf compressedSize = compressBound(rawData.size());
-            pf.data.resize(compressedSize);
-            if (compress(pf.data.data(), &compressedSize, rawData.data(), rawData.size()) == Z_OK) {
-                pf.data.resize(compressedSize);
-            } else {
-                pf.data = rawData;
-            }
-        } else {
-            pf.data = rawData;
+            entry.fileSize = static_cast<uint32_t>(entry.data.size());
+            pack.files.push_back(entry);
         }
-        preparedFiles.push_back(pf);
+        DLC::DLCPackHandler handler;
+        handler.save(file, pack);
     }
 
-    for (const auto& pf : preparedFiles) {
-        uint32_t sizeToWrite = static_cast<uint32_t>(pf.data.size());
-        file.write(reinterpret_cast<const char*>(&sizeToWrite), sizeof(sizeToWrite));
-        file.write(reinterpret_cast<const char*>(&pf.type), sizeof(pf.type));
-        write_u16string(file, pf.u16Path);
-    }
-
-    for (const auto& pf : preparedFiles) {
-        uint32_t fileParamCount = 0;
-        file.write(reinterpret_cast<const char*>(&fileParamCount), sizeof(fileParamCount));
-        file.write(reinterpret_cast<const char*>(pf.data.data()), pf.data.size());
-    }
-
-    std::cout << "DLC created successfully: " << outputFileName << (compressFiles ? " (Compressed)" : "") << std::endl;
+    std::cout << "Successfully created " << outputFileName << std::endl;
     return 0;
 }
