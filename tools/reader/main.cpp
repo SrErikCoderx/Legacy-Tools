@@ -49,46 +49,46 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::fstream file(argv[1], std::ios::in | std::ios::out | std::ios::binary);
+    std::fstream file(argv[1], std::ios::in | std::ios::binary);
     if (!file) {
         std::cerr << "Error: Could not open file " << argv[1] << std::endl;
         return 1;
     }
 
-    if (DLC::Archive::isArchive(file)) {
-        std::cout << "Detected Legacy Console Archive (.pck/.arc)" << std::endl;
-        DLC::Archive arc;
-        if (arc.load(file)) {
-            std::cout << "Files: " << arc.getEntries().size() << std::endl;
-            for (const auto& entry : arc.getEntries()) {
-                std::cout << " - " << entry.name << " (Size: " << entry.size << ", Offset: " << entry.offset << ")" << std::endl;
-            }
-        }
-    } else if (DLC::DLCPackHandler::isDLCPack(file)) {
-        std::cout << "Detected Legacy Console DLC Pack (.dlc)" << std::endl;
+    if (DLC::DLCPackHandler::isDLCPack(file)) {
+        std::cout << "Detected Legacy Console DLC Pack (.dlc/.pck)" << std::endl;
         DLC::DLCPack pack;
         DLC::DLCPackHandler handler;
         if (handler.load(file, pack)) {
             std::cout << "Version: " << pack.version << std::endl;
             std::cout << "Global Parameters: " << pack.globalParameters.size() << std::endl;
             for (const auto& fp : pack.globalParameters) {
-                std::cout << "  [" << fp.type << "] " << get_param_name(fp.type) << ": " << DLC::utf16le_to_utf8(fp.data) << std::endl;
+                std::cout << "  [" << fp.type << "] " << get_param_name(fp.type) << ": " << DLC::utf16_to_utf8(fp.data) << std::endl;
             }
             std::cout << "Files: " << pack.files.size() << std::endl;
             for (size_t i = 0; i < pack.files.size(); ++i) {
                 const auto& entry = pack.files[i];
-                std::cout << "File " << i << ": " << DLC::utf16le_to_utf8(entry.name) << std::endl;
+                std::cout << "File " << i << ": " << DLC::utf16_to_utf8(entry.name) << std::endl;
                 std::cout << "  Type: " << get_type_name(entry.type) << " (" << entry.type << ")" << std::endl;
                 std::cout << "  Size: " << entry.fileSize << " bytes" << std::endl;
                 std::cout << "  Parameters: " << entry.parameters.size() << std::endl;
                 for (const auto& fp : entry.parameters) {
-                    std::cout << "    [" << fp.type << "] " << get_param_name(fp.type) << ": " << DLC::utf16le_to_utf8(fp.data) << std::endl;
+                    std::cout << "    [" << fp.type << "] " << get_param_name(fp.type) << ": " << DLC::utf16_to_utf8(fp.data) << std::endl;
                 }
                 if (entry.data.size() > 2 && entry.data[0] == 0x78 && entry.data[1] == 0x9C) {
                     std::cout << "  Compression: Zlib (0x789C)" << std::endl;
                 } else {
                     std::cout << "  Compression: None" << std::endl;
                 }
+            }
+        }
+    } else if (DLC::Archive::isArchive(file)) {
+        std::cout << "Detected Legacy Console Archive (.pck/.arc)" << std::endl;
+        DLC::Archive arc;
+        if (arc.load(file)) {
+            std::cout << "Files: " << arc.getEntries().size() << std::endl;
+            for (const auto& entry : arc.getEntries()) {
+                std::cout << " - " << entry.name << " (Size: " << entry.size << ", Offset: " << entry.offset << ")" << std::endl;
             }
         }
     } else {

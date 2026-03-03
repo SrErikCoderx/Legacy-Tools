@@ -7,17 +7,21 @@ bool Archive::isArchive(std::iostream& stream) {
     auto pos = stream.tellg();
     EndianStream es(stream);
     es.setBigEndian(true);
-    uint32_t count = es.readU32();
 
-    // Heuristic: file count should be reasonable and first entry name length should be sane
-    bool result = (count > 0 && count < 100000);
-    if (result) {
-        uint16_t nameLen = es.readU16();
-        if (nameLen == 0 || nameLen > 1024) result = false;
-    }
+    // Read count
+    uint32_t count = es.readU32();
+    if (count == 0 || count > 0x10000) { stream.seekg(pos); return false; }
+
+    // Read first entry name length
+    uint16_t nameLen = es.readU16();
+    if (nameLen == 0 || nameLen > 256) { stream.seekg(pos); return false; }
+
+    // Structured DLC starts with Version (2 or 3) and then global param count.
+    // If it was structured DLC, the second U32 would be global param count.
+    // In media.arc, the second field is a U16 name length followed by ASCII.
 
     stream.seekg(pos);
-    return result;
+    return true;
 }
 
 bool Archive::load(std::iostream& stream) {
@@ -44,12 +48,12 @@ bool Archive::save(std::iostream& stream, const std::vector<std::string>& fileNa
     uint32_t count = static_cast<uint32_t>(fileNames.size());
     es.writeU32(count);
 
-    uint32_t currentOffset = 4; // Start with count
+    uint32_t headerSize = 4;
     for (const auto& name : fileNames) {
-        currentOffset += 2 + static_cast<uint32_t>(name.size()) + 4 + 4;
+        headerSize += 2 + static_cast<uint32_t>(name.size()) + 4 + 4;
     }
 
-    // Write headers
+    uint32_t currentOffset = headerSize;
     for (size_t i = 0; i < fileNames.size(); ++i) {
         es.writeU16(static_cast<uint16_t>(fileNames[i].size()));
         es.writeString(fileNames[i]);
@@ -58,7 +62,6 @@ bool Archive::save(std::iostream& stream, const std::vector<std::string>& fileNa
         currentOffset += static_cast<uint32_t>(fileData[i].size());
     }
 
-    // Write data
     for (const auto& data : fileData) {
         stream.write(reinterpret_cast<const char*>(data.data()), data.size());
     }

@@ -4,6 +4,7 @@
 #include <string>
 #include <filesystem>
 #include <zlib.h>
+#include <algorithm>
 #include "../common/dlc_format.h"
 #include "../common/dlc_utils.h"
 #include "../common/dlc_pack_format.h"
@@ -43,7 +44,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    bool isPck = (!forceDLC && (outputFileName.size() >= 4 && (outputFileName.substr(outputFileName.size() - 4) == ".pck" || outputFileName.substr(outputFileName.size() - 4) == ".arc")));
+    std::string lowerExt = outputFileName;
+    std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(), ::tolower);
+    bool isPck = (!forceDLC && (lowerExt.size() >= 4 && (lowerExt.substr(lowerExt.size() - 4) == ".pck" || lowerExt.substr(lowerExt.size() - 4) == ".arc")));
 
     if (isPck) {
         std::cout << "Creating Legacy Console Archive (.pck/.arc)..." << std::endl;
@@ -60,7 +63,7 @@ int main(int argc, char* argv[]) {
             if (doCompress) {
                 uLongf cSize = compressBound(content.size());
                 std::vector<uint8_t> compressed(cSize);
-                if (compress(compressed.data(), &cSize, content.data(), content.size()) == Z_OK) {
+                if (compress(compressed.data(), &cSize, content.data(), static_cast<uLong>(content.size())) == Z_OK) {
                     compressed.resize(cSize);
                     data.push_back(compressed);
                 } else data.push_back(content);
@@ -75,14 +78,14 @@ int main(int argc, char* argv[]) {
 
         DLC::FileParam fp;
         fp.type = DLC::PARAM_DISPLAY_NAME;
-        fp.data = DLC::utf8_to_utf16le("Custom Pack");
+        fp.data = DLC::utf8_to_utf16(fs::path(outputFileName).stem().string());
         pack.globalParameters.push_back(fp);
 
         for (const auto& p : inputFiles) {
             DLC::FileEntry entry;
             std::string rel = fs::relative(p, inputDir).string();
             std::replace(rel.begin(), rel.end(), '\\', '/');
-            entry.name = DLC::utf8_to_utf16le(rel);
+            entry.name = DLC::utf8_to_utf16(rel);
             entry.type = DLC::TYPE_TEXTURE;
 
             std::ifstream inFile(p, std::ios::binary);
@@ -91,7 +94,7 @@ int main(int argc, char* argv[]) {
             if (doCompress) {
                 uLongf cSize = compressBound(content.size());
                 entry.data.resize(cSize);
-                if (compress(entry.data.data(), &cSize, content.data(), content.size()) == Z_OK) {
+                if (compress(entry.data.data(), &cSize, content.data(), static_cast<uLong>(content.size())) == Z_OK) {
                     entry.data.resize(cSize);
                 } else entry.data = content;
             } else entry.data = content;

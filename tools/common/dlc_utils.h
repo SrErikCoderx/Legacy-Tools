@@ -7,7 +7,7 @@
 
 namespace DLC {
 
-inline std::string utf16le_to_utf8(const std::u16string& utf16) {
+inline std::string utf16_to_utf8(const std::u16string& utf16) {
     std::string utf8;
     for (char16_t cp : utf16) {
         if (cp < 0x80) {
@@ -24,7 +24,7 @@ inline std::string utf16le_to_utf8(const std::u16string& utf16) {
     return utf8;
 }
 
-inline std::u16string utf8_to_utf16le(const std::string& utf8) {
+inline std::u16string utf8_to_utf16(const std::string& utf8) {
     std::u16string utf16;
     for (size_t i = 0; i < utf8.size(); ) {
         uint32_t cp = 0;
@@ -44,7 +44,6 @@ inline std::u16string utf8_to_utf16le(const std::string& utf8) {
         if (cp < 0x10000) {
             utf16 += static_cast<char16_t>(cp);
         } else {
-            // Surrogate pairs
             cp -= 0x10000;
             utf16 += static_cast<char16_t>(0xD800 | (cp >> 10));
             utf16 += static_cast<char16_t>(0xDC00 | (cp & 0x3FF));

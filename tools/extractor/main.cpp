@@ -16,7 +16,8 @@ void decompress_and_save(const std::string& name, const std::vector<uint8_t>& da
     fs::create_directories(outPath.parent_path());
 
     std::vector<uint8_t> dataToSave;
-    if (data.size() > 2 && data[0] == 0x78 && data[1] == 0x9C) {
+    // Enhanced check for zlib: 0x78 0x9C, 0x78 0x01, 0x78 0xDA, or 0x78 0x5E
+    if (data.size() > 2 && data[0] == 0x78 && (data[1] == 0x9C || data[1] == 0x01 || data[1] == 0xDA || data[1] == 0x5E)) {
         std::cout << "  Decompressing " << name << "..." << std::endl;
         z_stream strm;
         strm.zalloc = Z_NULL; strm.zfree = Z_NULL; strm.opaque = Z_NULL;
@@ -24,7 +25,7 @@ void decompress_and_save(const std::string& name, const std::vector<uint8_t>& da
         strm.next_in = const_cast<Bytef*>(data.data());
 
         if (inflateInit(&strm) == Z_OK) {
-            uint8_t out[32768];
+            uint8_t out[65536];
             do {
                 strm.avail_out = sizeof(out);
                 strm.next_out = out;
@@ -33,6 +34,8 @@ void decompress_and_save(const std::string& name, const std::vector<uint8_t>& da
                 dataToSave.insert(dataToSave.end(), out, out + (sizeof(out) - strm.avail_out));
             } while (strm.avail_out == 0);
             inflateEnd(&strm);
+        } else {
+            dataToSave = data;
         }
     } else {
         dataToSave = data;
@@ -59,27 +62,27 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (DLC::Archive::isArchive(file)) {
-        std::cout << "Extracting Legacy Console Archive..." << std::endl;
-        DLC::Archive arc;
-        if (arc.load(file)) {
-            for (const auto& entry : arc.getEntries()) {
-                std::cout << " - " << entry.name << std::endl;
-                std::vector<uint8_t> data(entry.size);
-                file.seekg(entry.offset);
-                file.read(reinterpret_cast<char*>(data.data()), entry.size);
-                decompress_and_save(entry.name, data, outputDir);
-            }
-        }
-    } else if (DLC::DLCPackHandler::isDLCPack(file)) {
+    if (DLC::DLCPackHandler::isDLCPack(file)) {
         std::cout << "Extracting Legacy Console DLC Pack..." << std::endl;
         DLC::DLCPack pack;
         DLC::DLCPackHandler handler;
         if (handler.load(file, pack)) {
             for (const auto& entry : pack.files) {
-                std::string name = DLC::utf16le_to_utf8(entry.name);
-                std::cout << " - " << name << std::endl;
+                std::string name = DLC::utf16_to_utf8(entry.name);
+                std::cout << " - " << name << " (" << entry.fileSize << " bytes)" << std::endl;
                 decompress_and_save(name, entry.data, outputDir);
+            }
+        }
+    } else if (DLC::Archive::isArchive(file)) {
+        std::cout << "Extracting Legacy Console Archive..." << std::endl;
+        DLC::Archive arc;
+        if (arc.load(file)) {
+            for (const auto& entry : arc.getEntries()) {
+                std::cout << " - " << entry.name << " (" << entry.size << " bytes)" << std::endl;
+                std::vector<uint8_t> data(entry.size);
+                file.seekg(entry.offset);
+                file.read(reinterpret_cast<char*>(data.data()), entry.size);
+                decompress_and_save(entry.name, data, outputDir);
             }
         }
     } else {

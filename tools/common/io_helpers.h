@@ -27,13 +27,13 @@ public:
     void setBigEndian(bool be) { bigEndian = be; }
 
     uint16_t readU16() {
-        uint16_t val;
+        uint16_t val = 0;
         stream.read(reinterpret_cast<char*>(&val), 2);
         return bigEndian ? swap16(val) : val;
     }
 
     uint32_t readU32() {
-        uint32_t val;
+        uint32_t val = 0;
         stream.read(reinterpret_cast<char*>(&val), 4);
         return bigEndian ? swap32(val) : val;
     }
@@ -49,6 +49,7 @@ public:
     }
 
     std::string readString(size_t len) {
+        if (len == 0) return "";
         std::vector<char> buf(len);
         stream.read(buf.data(), len);
         return std::string(buf.data(), len);
@@ -60,11 +61,10 @@ public:
 
     std::u16string readUTF16(size_t wchCount) {
         std::u16string res;
+        res.reserve(wchCount);
         for (size_t i = 0; i < wchCount; ++i) {
-            uint16_t val;
+            uint16_t val = 0;
             stream.read(reinterpret_cast<char*>(&val), 2);
-            // DLC format UTF-16 is usually LE even on BE systems if it's following a spec,
-            // but let's assume it follows the stream endianness for now unless proven otherwise.
             res += static_cast<char16_t>(bigEndian ? swap16(val) : val);
         }
         return res;

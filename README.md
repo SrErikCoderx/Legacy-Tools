@@ -1,21 +1,11 @@
-# Legacy-Tools
+# Legacy Console Asset Tools
 
-A suite of high-performance C++ tools designed for managing Minecraft Legacy Console Edition assets, including DLC packs and general archives.
+A specialized suite of C++ utilities for managing asset formats used in Minecraft Legacy Console Edition. These tools support the structured DLC pack format and the standard game media archives.
 
-## Tools Included
-
-### dlc-creator
-Pack files and metadata into Legacy Console formats. It automatically chooses between the Archive format (.pck/.arc) and the structured DLC format (.dlc) based on the output file extension.
-
-**Usage:**
-```bash
-./dlc-creator <output_file> <input_directory> [--compress] [--dlc]
-```
-- `--compress`: Enable zlib compression for all files.
-- `--dlc`: Force structured DLC format regardless of extension.
+## Tools Overview
 
 ### dlc-reader
-Analyze and display the internal structure, metadata, and parameters of Legacy Console files. It supports auto-detection of both .pck/.arc and .dlc formats.
+Analyzes and displays metadata for Legacy Console asset files. It automatically detects and parses both the Structured DLC (.dlc/.pck) format and the Media Archive (.arc/.pck) format.
 
 **Usage:**
 ```bash
@@ -23,21 +13,41 @@ Analyze and display the internal structure, metadata, and parameters of Legacy C
 ```
 
 ### dlc-extractor
-Unpack all files from a Legacy Console archive or DLC pack into a specified directory. It handles Big-Endian data and automatically performs zlib decompression for compressed streams.
+Extracts the contents of a Legacy Console archive or DLC pack. It features automatic format detection, Big-Endian handling, and integrated Zlib decompression for compressed file entries.
 
 **Usage:**
 ```bash
 ./dlc-extractor <input_file> [output_directory]
 ```
 
+### dlc-creator
+Generates Legacy Console compatible asset files. The tool selects the appropriate format based on the output file extension or explicit flags.
+
+**Usage:**
+```bash
+./dlc-creator <output_file> <input_directory> [--compress] [--dlc]
+```
+- `--compress`: Applies Zlib compression to all file entries.
+- `--dlc`: Forces the Structured DLC format regardless of the file extension.
+
 ## Supported Formats
 
-- **Legacy Console Archive (.pck / .arc)**: High-level archive format used for game media and tutorials. Uses Big-Endian headers.
-- **Structured DLC Pack (.dlc)**: Complex binary format for downloadable content, supporting global and file-specific parameters (Version 2 & 3).
+- **Media Archive (.arc / .pck)**: A simple Big-Endian archive format used for general media and localization data.
+- **Structured DLC Pack (.pck / .dlc)**: A complex container format (Versions 2 and 3) supporting global metadata, file-specific parameters, and UTF-16BE string encoding.
+
+## Technical Specifications
+
+- **Endianness**: Fully Big-Endian aware, compatible with PlayStation 3 and Xbox 360 binary layouts.
+- **Strings**: Robust handling of UTF-16BE to UTF-8 conversion.
+- **Compression**: Native support for Zlib (DEFLATE) streams within asset containers.
+
+## Build Requirements
+
+- C++17 compliant compiler
+- CMake 3.10 or higher
+- Zlib (provided in dependencies)
 
 ## Build Instructions
-
-These tools require a C++17 compliant compiler and CMake 3.10 or higher.
 
 ```bash
 mkdir build
@@ -49,12 +59,10 @@ make
 ## Repository Structure
 
 - `tools/`: Source code for the asset management tools.
-- `DLC/`: Original game logic for DLC handling (reference).
-- `Ps3 Dependencies/`: Supporting libraries and assets for the PlayStation 3 environment.
-  - See `Ps3 Dependencies/REVIEW.md` for a detailed analysis.
-- `GameRules/`: Documentation and tools for game rule management.
+- `DLC/`: Reference implementation of the game's DLC management logic.
+- `Ps3 Dependencies/`: Supporting libraries and a comprehensive review of the PlayStation 3 environment.
+- `GameRules/`: Documentation and assets related to game rule definitions.
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
-Includes components from `zlib`.
+This project is released under the MIT License. It includes components from the Zlib library, which is subject to its own license terms. See the `LICENSE` file for full details.
