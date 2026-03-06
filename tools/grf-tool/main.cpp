@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <filesystem>
 #include <zlib.h>
 #include "../common/grf_format.h"
 

@@ -11,7 +11,7 @@ namespace DLC {
 
 class LocTable {
 public:
-    uint32_t version;
+    uint32_t version = 0;
     std::vector<std::string> strings;
 
     bool load(std::iostream& stream) {
@@ -19,9 +19,9 @@ public:
         es.setBigEndian(true);
 
         if (!stream.read(reinterpret_cast<char*>(&version), 4)) return false;
-        version = swap32(version); // Assuming BE
+        version = swap32(version);
 
-        uint32_t count;
+        uint32_t count = 0;
         if (!stream.read(reinterpret_cast<char*>(&count), 4)) return false;
         count = swap32(count);
 
@@ -29,7 +29,7 @@ public:
 
         strings.clear();
         for (uint32_t i = 0; i < count; ++i) {
-            uint16_t len;
+            uint16_t len = 0;
             if (!stream.read(reinterpret_cast<char*>(&len), 2)) break;
             len = swap16(len);
 
@@ -38,20 +38,6 @@ public:
 
             // Skip 4-byte ID/Hash
             stream.ignore(4);
-        std::vector<uint32_t> offsets(count);
-        for (uint32_t i = 0; i < count; ++i) {
-            uint32_t off;
-            stream.read(reinterpret_cast<char*>(&off), 4);
-            offsets[i] = swap32(off);
-        }
-
-        strings.clear();
-        for (uint32_t i = 0; i < count; ++i) {
-            stream.seekg(offsets[i]);
-            uint16_t len;
-            stream.read(reinterpret_cast<char*>(&len), 2);
-            len = swap16(len);
-            strings.push_back(es.readString(len));
         }
         return true;
     }
@@ -63,19 +49,11 @@ public:
         es.writeU32(version);
         es.writeU32(static_cast<uint32_t>(strings.size()));
 
-        uint32_t currentOffset = 8 + (static_cast<uint32_t>(strings.size()) * 4);
-        std::vector<uint32_t> offsets;
+        uint32_t id = 100;
         for (const auto& s : strings) {
-            offsets.push_back(currentOffset);
-            currentOffset += 2 + static_cast<uint32_t>(s.size());
-        }
-
-        for (uint32_t off : offsets) {
-            es.writeU32(off);
-        }
-
-        for (const auto& s : strings) {
-            es.writeUTF(s);
+            es.writeU16(static_cast<uint16_t>(s.size()));
+            stream.write(s.data(), s.size());
+            es.writeU32(id++);
         }
         return true;
     }
