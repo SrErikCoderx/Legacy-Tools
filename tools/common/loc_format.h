@@ -38,6 +38,20 @@ public:
 
             // Skip 4-byte ID/Hash
             stream.ignore(4);
+        std::vector<uint32_t> offsets(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t off;
+            stream.read(reinterpret_cast<char*>(&off), 4);
+            offsets[i] = swap32(off);
+        }
+
+        strings.clear();
+        for (uint32_t i = 0; i < count; ++i) {
+            stream.seekg(offsets[i]);
+            uint16_t len;
+            stream.read(reinterpret_cast<char*>(&len), 2);
+            len = swap16(len);
+            strings.push_back(es.readString(len));
         }
         return true;
     }
@@ -49,11 +63,19 @@ public:
         es.writeU32(version);
         es.writeU32(static_cast<uint32_t>(strings.size()));
 
-        uint32_t id = 100; // Generic starting ID
+        uint32_t currentOffset = 8 + (static_cast<uint32_t>(strings.size()) * 4);
+        std::vector<uint32_t> offsets;
         for (const auto& s : strings) {
-            es.writeU16(static_cast<uint16_t>(s.size()));
-            stream.write(s.data(), s.size());
-            es.writeU32(id++);
+            offsets.push_back(currentOffset);
+            currentOffset += 2 + static_cast<uint32_t>(s.size());
+        }
+
+        for (uint32_t off : offsets) {
+            es.writeU32(off);
+        }
+
+        for (const auto& s : strings) {
+            es.writeUTF(s);
         }
         return true;
     }

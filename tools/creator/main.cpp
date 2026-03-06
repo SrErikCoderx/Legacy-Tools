@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <string>
 #include <filesystem>
@@ -13,6 +12,14 @@
 #include "../common/archive_format.h"
 
 namespace fs = std::filesystem;
+
+// Enhanced Creator that can read a manifest file
+// Manifest format:
+// VERSION <num>
+// MAP <id> <name>
+// GLOBAL <id> <value>
+// FILE <path_in_pck> <type_id> <source_path>
+//   PARAM <id> <value>
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -48,6 +55,7 @@ int main(int argc, char* argv[]) {
             std::string value;
             ss >> id;
             std::getline(ss, value);
+            // Trim quotes and space
             size_t start = value.find_first_of('"');
             size_t end = value.find_last_of('"');
             if (start != std::string::npos && end != std::string::npos && start < end) {
