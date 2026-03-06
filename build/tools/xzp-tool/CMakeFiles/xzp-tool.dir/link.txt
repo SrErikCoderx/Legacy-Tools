@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/xzp-tool.dir/main.cpp.o" -o xzp-tool   -L"/app/Ps3 Dependencies/zlib"

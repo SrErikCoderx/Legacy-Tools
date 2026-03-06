@@ -30,7 +30,10 @@ public:
 
         version = es.readU32();
         totalSize = es.readU32();
-        uint32_t numEntries = es.readU32();
+
+        // numEntries at 0x14
+        stream.seekg(0x14, std::ios::beg);
+        uint16_t numEntries = es.readU16();
 
         entries.clear();
         for (uint32_t i = 0; i < numEntries; ++i) {
@@ -38,31 +41,13 @@ public:
             entry.size = es.readU32();
             entry.offset = es.readU32();
 
-            // Skip 6 bytes (often Hash + Unknown)
-            stream.ignore(6);
-
-            uint16_t nameLen;
+            uint16_t nameLen = 0;
             stream.read(reinterpret_cast<char*>(&nameLen), 2);
-            // NameLen is often Little Endian in these files
-            if (es.isBigEndian()) {
-                if (nameLen > 0xFF) nameLen = ((nameLen & 0xFF) << 8) | (nameLen >> 8);
-            }
+            // XUIZ nameLen is LE
 
-            if (nameLen > 1024) break;
+            if (nameLen > 1024 || nameLen == 0) break;
 
-            std::u16string u16name;
-            for(int j=0; j<nameLen; ++j) {
-                uint16_t c;
-                stream.read(reinterpret_cast<char*>(&c), 2);
-                if ((c & 0xFF00) == 0 && (c & 0x00FF) != 0) {
-                   // Likely LE
-                } else if ((c & 0x00FF) == 0 && (c & 0xFF00) != 0) {
-                   // Likely BE
-                   c = (c >> 8) | (c << 8);
-                }
-                u16name += static_cast<char16_t>(c);
-            }
-            entry.name = u16name;
+            entry.name = es.readUTF16LE(nameLen);
             entries.push_back(entry);
         }
         return true;

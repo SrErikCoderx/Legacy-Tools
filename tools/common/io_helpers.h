@@ -25,6 +25,7 @@ public:
     EndianStream(std::iostream& s) : stream(s), bigEndian(true) {}
 
     void setBigEndian(bool be) { bigEndian = be; }
+    bool isBigEndian() const { return bigEndian; }
 
     uint16_t readU16() {
         uint16_t val = 0;
@@ -36,6 +37,18 @@ public:
         uint32_t val = 0;
         stream.read(reinterpret_cast<char*>(&val), 4);
         return bigEndian ? swap32(val) : val;
+    }
+
+    uint16_t readU16LE() {
+        uint16_t val = 0;
+        stream.read(reinterpret_cast<char*>(&val), 2);
+        return val; // Simplified for LE hosts
+    }
+
+    uint32_t readU32LE() {
+        uint32_t val = 0;
+        stream.read(reinterpret_cast<char*>(&val), 4);
+        return val;
     }
 
     void writeU16(uint16_t val) {
@@ -66,6 +79,17 @@ public:
             uint16_t val = 0;
             stream.read(reinterpret_cast<char*>(&val), 2);
             res += static_cast<char16_t>(bigEndian ? swap16(val) : val);
+        }
+        return res;
+    }
+
+    std::u16string readUTF16LE(size_t wchCount) {
+        std::u16string res;
+        res.reserve(wchCount);
+        for (size_t i = 0; i < wchCount; ++i) {
+            uint16_t val = 0;
+            stream.read(reinterpret_cast<char*>(&val), 2);
+            res += static_cast<char16_t>(val);
         }
         return res;
     }

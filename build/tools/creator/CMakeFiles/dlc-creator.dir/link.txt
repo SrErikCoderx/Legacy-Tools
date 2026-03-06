@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/dlc-creator.dir/main.cpp.o" "CMakeFiles/dlc-creator.dir/__/common/archive_format.cpp.o" "CMakeFiles/dlc-creator.dir/__/common/dlc_pack_format.cpp.o" -o dlc-creator   -L"/app/Ps3 Dependencies/zlib"  -Wl,-rpath,"/app/Ps3 Dependencies/zlib" -lz

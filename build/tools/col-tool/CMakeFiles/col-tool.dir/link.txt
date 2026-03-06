@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/col-tool.dir/main.cpp.o" -o col-tool   -L"/app/Ps3 Dependencies/zlib"
