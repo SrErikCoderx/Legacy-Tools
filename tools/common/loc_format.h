@@ -27,6 +27,17 @@ public:
 
         if (count > 100000) return false;
 
+        strings.clear();
+        for (uint32_t i = 0; i < count; ++i) {
+            uint16_t len;
+            if (!stream.read(reinterpret_cast<char*>(&len), 2)) break;
+            len = swap16(len);
+
+            std::string s = es.readString(len);
+            strings.push_back(s);
+
+            // Skip 4-byte ID/Hash
+            stream.ignore(4);
         std::vector<uint32_t> offsets(count);
         for (uint32_t i = 0; i < count; ++i) {
             uint32_t off;
