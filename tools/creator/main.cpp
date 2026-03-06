@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <string>
 #include <filesystem>
@@ -12,14 +13,6 @@
 #include "../common/archive_format.h"
 
 namespace fs = std::filesystem;
-
-// Enhanced Creator that can read a manifest file
-// Manifest format:
-// VERSION <num>
-// MAP <id> <name>
-// GLOBAL <id> <value>
-// FILE <path_in_pck> <type_id> <source_path>
-//   PARAM <id> <value>
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -55,13 +48,13 @@ int main(int argc, char* argv[]) {
             std::string value;
             ss >> id;
             std::getline(ss, value);
-            // Trim quotes and space
             size_t start = value.find_first_of('"');
             size_t end = value.find_last_of('"');
             if (start != std::string::npos && end != std::string::npos && start < end) {
                 value = value.substr(start + 1, end - start - 1);
             } else {
-                value = value.substr(value.find_first_not_of(" \t"));
+                if (value.find_first_not_of(" \t") != std::string::npos)
+                    value = value.substr(value.find_first_not_of(" \t"));
             }
             pack.globalParameters.push_back({id, DLC::utf8_to_utf16(value)});
         } else if (cmd == "FILE") {
@@ -96,7 +89,8 @@ int main(int argc, char* argv[]) {
             if (start != std::string::npos && end != std::string::npos && start < end) {
                 value = value.substr(start + 1, end - start - 1);
             } else {
-                value = value.substr(value.find_first_not_of(" \t"));
+                if (value.find_first_not_of(" \t") != std::string::npos)
+                    value = value.substr(value.find_first_not_of(" \t"));
             }
             currentFile->parameters.push_back({id, DLC::utf8_to_utf16(value)});
         }
