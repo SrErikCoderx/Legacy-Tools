@@ -1,11 +1,11 @@
 # Legacy Console Asset Tools
 
-A specialized suite of C++ utilities for managing asset formats used in Minecraft Legacy Console Edition. These tools support the structured DLC pack format and the standard game media archives.
+A comprehensive suite of C++ utilities for managing asset formats used in Minecraft Legacy Console Edition. This project provides low-level access to proprietary binary containers, string tables, color configurations, and game rules.
 
-## Tools Overview
+## Core Asset Tools
 
 ### dlc-reader
-Analyzes and displays metadata for Legacy Console asset files. It automatically detects and parses both the Structured DLC (.dlc/.pck) format and the Media Archive (.arc/.pck) format.
+Analyzes and displays detailed metadata for Legacy Console asset files. It features advanced format detection for Structured DLC packs and sequential Media Archives.
 
 **Usage:**
 ```bash
@@ -13,7 +13,7 @@ Analyzes and displays metadata for Legacy Console asset files. It automatically 
 ```
 
 ### dlc-extractor
-Extracts the contents of a Legacy Console archive or DLC pack. It features automatic format detection, Big-Endian handling, and integrated Zlib decompression for compressed file entries.
+Unpacks the contents of supported containers. It automatically handles Big-Endian data and performs Zlib decompression for compressed streams.
 
 **Usage:**
 ```bash
@@ -21,33 +21,47 @@ Extracts the contents of a Legacy Console archive or DLC pack. It features autom
 ```
 
 ### dlc-creator
-Generates Legacy Console compatible asset files. The tool selects the appropriate format based on the output file extension or explicit flags.
+Generates production-ready asset files. It supports two modes:
+1. **Archive Mode**: Creates sequential .pck/.arc files from a directory.
+2. **Manifest Mode**: Creates structured .dlc files using a manifest for precise control over metadata and parameters.
 
 **Usage:**
 ```bash
-./dlc-creator <output_file> <input_directory> [--compress] [--dlc]
+./dlc-creator <manifest_or_directory> [output_file] [--compress] [--dlc]
 ```
-- `--compress`: Applies Zlib compression to all file entries.
-- `--dlc`: Forces the Structured DLC format regardless of the file extension.
+
+## Specialized Format Tools
+
+### loc-tool
+Manages 4J Studios StringTable (`.loc`) files.
+- `export`: Converts binary `.loc` to an editable text format.
+- `import`: Recompiles text back into a binary `.loc`.
+
+### col-tool
+Manages 4J Studios ColourTable (`.col`) files.
+- `export`: Extracts color definitions (RGBA) to text.
+- `import`: Compiles text definitions into a binary `.col`.
+
+### grf-tool
+Analyzes and extracts data from 4J Studios GameRules (`.grf`/`.grh`) containers. It decompresses the payload and reports the internal string lookup table.
+
+### xzp-tool
+Extracts assets from XUI Package (`.xzp`) files used by the game's UI system.
 
 ## Supported Formats
 
-- **Media Archive (.arc / .pck)**: A simple Big-Endian archive format used for general media and localization data.
-- **Structured DLC Pack (.pck / .dlc)**: A complex container format (Versions 2 and 3) supporting global metadata, file-specific parameters, and UTF-16BE string encoding.
-
-## Technical Specifications
-
-- **Endianness**: Fully Big-Endian aware, compatible with PlayStation 3 and Xbox 360 binary layouts.
-- **Strings**: Robust handling of UTF-16BE to UTF-8 conversion.
-- **Compression**: Native support for Zlib (DEFLATE) streams within asset containers.
-
-## Build Requirements
-
-- C++17 compliant compiler
-- CMake 3.10 or higher
-- Zlib (provided in dependencies)
+| Extension | Format Type | Description |
+|-----------|-------------|-------------|
+| `.pck` / `.arc` | Media Archive | Sequential Big-Endian file container. |
+| `.dlc` / `.pck` | Structured DLC | Complex container with global/file metadata (v2/v3). |
+| `.loc` | StringTable | Localization data with offset-based lookup. |
+| `.col` | ColourTable | Versioned RGBA color definition table. |
+| `.grf` / `.grh` | GameRules | Compressed XML-style game configuration. |
+| `.xzp` | XUIZ Package | XUI asset container. |
 
 ## Build Instructions
+
+These tools require a C++17 compliant compiler and CMake 3.10+.
 
 ```bash
 mkdir build
@@ -56,13 +70,6 @@ cmake ..
 make
 ```
 
-## Repository Structure
-
-- `tools/`: Source code for the asset management tools.
-- `DLC/`: Reference implementation of the game's DLC management logic.
-- `Ps3 Dependencies/`: Supporting libraries and a comprehensive review of the PlayStation 3 environment.
-- `GameRules/`: Documentation and assets related to game rule definitions.
-
 ## License
 
-This project is released under the MIT License. It includes components from the Zlib library, which is subject to its own license terms. See the `LICENSE` file for full details.
+MIT License. Includes Zlib components.

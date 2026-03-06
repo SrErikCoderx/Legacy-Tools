@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <zlib.h>
 #include <algorithm>
+#include <map>
 #include "../common/dlc_format.h"
 #include "../common/dlc_utils.h"
 #include "../common/dlc_pack_format.h"
@@ -12,30 +13,93 @@
 
 namespace fs = std::filesystem;
 
+// Enhanced Creator that can read a manifest file
+// Manifest format:
+// VERSION <num>
+// MAP <id> <name>
+// GLOBAL <id> <value>
+// FILE <path_in_pck> <type_id> <source_path>
+//   PARAM <id> <value>
+
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <output_file> <input_dir> [--compress] [--dlc]" << std::endl;
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <manifest_file> [output_file]" << std::endl;
         return 1;
     }
 
-    std::string outputFileName = argv[1];
-    std::string inputDir = argv[2];
-    bool doCompress = false;
-    bool forceDLC = false;
-
-    for (int i = 3; i < argc; ++i) {
-        if (std::string(argv[i]) == "--compress") doCompress = true;
-        if (std::string(argv[i]) == "--dlc") forceDLC = true;
-    }
-
-    if (!fs::exists(inputDir) || !fs::is_directory(inputDir)) {
-        std::cerr << "Error: Input directory does not exist." << std::endl;
+    std::ifstream manifest(argv[1]);
+    if (!manifest) {
+        std::cerr << "Error: Could not open manifest file." << std::endl;
         return 1;
     }
 
-    std::vector<fs::path> inputFiles;
-    for (const auto& entry : fs::recursive_directory_iterator(inputDir)) {
-        if (entry.is_regular_file()) inputFiles.push_back(entry.path());
+    std::string outputFileName = (argc >= 3) ? argv[2] : "out.pck";
+
+    DLC::DLCPack pack;
+    pack.version = 3;
+
+    std::string line;
+    DLC::FileEntry* currentFile = nullptr;
+
+    while (std::getline(manifest, line)) {
+        if (line.empty() || line[0] == '#') continue;
+
+        std::stringstream ss(line);
+        std::string cmd;
+        ss >> cmd;
+
+        if (cmd == "VERSION") {
+            ss >> pack.version;
+        } else if (cmd == "GLOBAL") {
+            uint32_t id;
+            std::string value;
+            ss >> id;
+            std::getline(ss, value);
+            // Trim quotes and space
+            size_t start = value.find_first_of('"');
+            size_t end = value.find_last_of('"');
+            if (start != std::string::npos && end != std::string::npos && start < end) {
+                value = value.substr(start + 1, end - start - 1);
+            } else {
+                value = value.substr(value.find_first_not_of(" \t"));
+            }
+            pack.globalParameters.push_back({id, DLC::utf8_to_utf16(value)});
+        } else if (cmd == "FILE") {
+            std::string pckPath, sourcePath;
+            uint32_t type;
+            ss >> pckPath >> type >> sourcePath;
+
+            DLC::FileEntry entry;
+            entry.name = DLC::utf8_to_utf16(pckPath);
+            entry.type = type;
+
+            std::ifstream inFile(sourcePath, std::ios::binary);
+            if (!inFile) {
+                std::cerr << "Warning: Could not open source file " << sourcePath << std::endl;
+            } else {
+                entry.data.assign((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+            }
+            entry.fileSize = static_cast<uint32_t>(entry.data.size());
+            pack.files.push_back(entry);
+            currentFile = &pack.files.back();
+        } else if (cmd == "PARAM") {
+            if (!currentFile) {
+                std::cerr << "Error: PARAM outside of FILE context." << std::endl;
+                continue;
+            }
+            uint32_t id;
+            std::string value;
+            ss >> id;
+            std::getline(ss, value);
+            size_t start = value.find_first_of('"');
+            size_t end = value.find_last_of('"');
+            if (start != std::string::npos && end != std::string::npos && start < end) {
+                value = value.substr(start + 1, end - start - 1);
+            } else {
+                value = value.substr(value.find_first_not_of(" \t"));
+            }
+            currentFile->parameters.push_back({id, DLC::utf8_to_utf16(value)});
+        }
     }
 
     std::fstream file(outputFileName, std::ios::out | std::ios::binary);
@@ -44,68 +108,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string lowerExt = outputFileName;
-    std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(), ::tolower);
-    bool isPck = (!forceDLC && (lowerExt.size() >= 4 && (lowerExt.substr(lowerExt.size() - 4) == ".pck" || lowerExt.substr(lowerExt.size() - 4) == ".arc")));
+    DLC::DLCPackHandler handler;
+    handler.save(file, pack);
 
-    if (isPck) {
-        std::cout << "Creating Legacy Console Archive (.pck/.arc)..." << std::endl;
-        std::vector<std::string> names;
-        std::vector<std::vector<uint8_t>> data;
-        for (const auto& p : inputFiles) {
-            std::string rel = fs::relative(p, inputDir).string();
-            std::replace(rel.begin(), rel.end(), '\\', '/');
-            names.push_back(rel);
-
-            std::ifstream inFile(p, std::ios::binary);
-            std::vector<uint8_t> content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-
-            if (doCompress) {
-                uLongf cSize = compressBound(content.size());
-                std::vector<uint8_t> compressed(cSize);
-                if (compress(compressed.data(), &cSize, content.data(), static_cast<uLong>(content.size())) == Z_OK) {
-                    compressed.resize(cSize);
-                    data.push_back(compressed);
-                } else data.push_back(content);
-            } else data.push_back(content);
-        }
-        DLC::Archive arc;
-        arc.save(file, names, data);
-    } else {
-        std::cout << "Creating Legacy Console DLC Pack (.dlc)..." << std::endl;
-        DLC::DLCPack pack;
-        pack.version = 3;
-
-        DLC::FileParam fp;
-        fp.type = DLC::PARAM_DISPLAY_NAME;
-        fp.data = DLC::utf8_to_utf16(fs::path(outputFileName).stem().string());
-        pack.globalParameters.push_back(fp);
-
-        for (const auto& p : inputFiles) {
-            DLC::FileEntry entry;
-            std::string rel = fs::relative(p, inputDir).string();
-            std::replace(rel.begin(), rel.end(), '\\', '/');
-            entry.name = DLC::utf8_to_utf16(rel);
-            entry.type = DLC::TYPE_TEXTURE;
-
-            std::ifstream inFile(p, std::ios::binary);
-            std::vector<uint8_t> content((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-
-            if (doCompress) {
-                uLongf cSize = compressBound(content.size());
-                entry.data.resize(cSize);
-                if (compress(entry.data.data(), &cSize, content.data(), static_cast<uLong>(content.size())) == Z_OK) {
-                    entry.data.resize(cSize);
-                } else entry.data = content;
-            } else entry.data = content;
-
-            entry.fileSize = static_cast<uint32_t>(entry.data.size());
-            pack.files.push_back(entry);
-        }
-        DLC::DLCPackHandler handler;
-        handler.save(file, pack);
-    }
-
-    std::cout << "Successfully created " << outputFileName << std::endl;
+    std::cout << "Successfully created structured DLC: " << outputFileName << std::endl;
     return 0;
 }

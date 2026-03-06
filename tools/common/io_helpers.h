@@ -78,6 +78,16 @@ public:
         }
     }
 
+    std::string readUTF() {
+        uint16_t len = readU16();
+        return readString(len);
+    }
+
+    void writeUTF(const std::string& s) {
+        writeU16(static_cast<uint16_t>(s.size()));
+        writeString(s);
+    }
+
 private:
     std::iostream& stream;
     bool bigEndian;
