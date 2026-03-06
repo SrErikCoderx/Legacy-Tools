@@ -29,7 +29,9 @@ public:
 
         version = es.readU16();
         compressionType = static_cast<uint8_t>(stream.get());
-        for (int i = 0; i < 8; ++i) stream.get(); // Padding
+
+        // Skip until count at offset 14
+        stream.ignore(11);
 
         std::stringstream decompressed;
         std::iostream* contentStream = &stream;
@@ -47,26 +49,36 @@ public:
                 return false;
             }
             decompressed.write(reinterpret_cast<const char*>(uncompressed.data()), uncompressedSize);
+            decompressed.seekg(0);
             contentStream = &decompressed;
         }
 
         EndianStream ces(*contentStream);
-        ces.setBigEndian(true);
+        ces.setBigEndian(false); // Counts in internal stream are often LE
 
-        uint32_t stringCount = ces.readU32();
+        uint16_t stringCount = ces.readU16();
         stringLookup.clear();
-        for (uint32_t i = 0; i < stringCount; ++i) {
-            stringLookup.push_back(ces.readUTF());
+        for (uint16_t i = 0; i < stringCount; ++i) {
+            uint8_t len = static_cast<uint8_t>(contentStream->get());
+            if (contentStream->eof()) break;
+            stringLookup.push_back(ces.readString(len));
+            contentStream->ignore(1); // Null terminator
         }
 
-        uint32_t fileCount = ces.readU32();
+        uint16_t fileCount = ces.readU16();
         files.clear();
-        for (uint32_t i = 0; i < fileCount; ++i) {
+        for (uint16_t i = 0; i < fileCount; ++i) {
             GrfFile f;
-            f.name = ces.readUTF();
+            uint8_t nameLen = static_cast<uint8_t>(contentStream->get());
+            if (contentStream->eof()) break;
+            f.name = ces.readString(nameLen);
+            contentStream->ignore(1); // Null terminator
+
             uint32_t size = ces.readU32();
-            f.data.resize(size);
-            contentStream->read(reinterpret_cast<char*>(f.data.data()), size);
+            if (size > 0 && size < 100 * 1024 * 1024) {
+                f.data.resize(size);
+                contentStream->read(reinterpret_cast<char*>(f.data.data()), size);
+            }
             files.push_back(f);
         }
 

@@ -1,0 +1,11 @@
+Version: 1
+String Lookup:
+  __ROOT__
+  GameRules
+  MapOptions
+  seed
+  spawnX
+  spawnY
+  spawnZ
+  flatworld
+  isTutorial

@@ -21,23 +21,27 @@ public:
         if (!stream.read(reinterpret_cast<char*>(&version), 4)) return false;
         version = swap32(version);
 
-        uint32_t count = 0;
-        if (!stream.read(reinterpret_cast<char*>(&count), 4)) return false;
-        count = swap32(count);
-
-        if (count > 100000) return false;
-
         strings.clear();
-        for (uint32_t i = 0; i < count; ++i) {
-            uint16_t len = 0;
-            if (!stream.read(reinterpret_cast<char*>(&len), 2)) break;
-            len = swap16(len);
+        while (!stream.eof()) {
+            uint32_t count = 0;
+            if (!stream.read(reinterpret_cast<char*>(&count), 4)) break;
+            count = swap32(count);
 
-            std::string s = es.readString(len);
-            strings.push_back(s);
+            if (count == 0 || count > 100000) break;
 
-            // Skip 4-byte ID/Hash
-            stream.ignore(4);
+            for (uint32_t i = 0; i < count; ++i) {
+                uint16_t len = 0;
+                if (!stream.read(reinterpret_cast<char*>(&len), 2)) break;
+                len = swap16(len);
+
+                std::string s = es.readString(len);
+                strings.push_back(s);
+
+                // Skip 4-byte ID/Hash
+                stream.ignore(4);
+            }
+            // Check for more blocks
+            stream.peek();
         }
         return true;
     }

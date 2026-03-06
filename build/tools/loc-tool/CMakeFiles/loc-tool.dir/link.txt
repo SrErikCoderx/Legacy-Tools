@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/loc-tool.dir/main.cpp.o" -o loc-tool   -L"/app/Ps3 Dependencies/zlib"

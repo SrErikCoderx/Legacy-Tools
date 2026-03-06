@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/dlc-reader.dir/main.cpp.o" "CMakeFiles/dlc-reader.dir/__/common/archive_format.cpp.o" "CMakeFiles/dlc-reader.dir/__/common/dlc_pack_format.cpp.o" -o dlc-reader   -L"/app/Ps3 Dependencies/zlib"
